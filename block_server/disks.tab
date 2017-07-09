@@ -1,0 +1,7 @@
+# Original path		Translated path
+/dev/dsk/c3t0d0s7	/dev/sda7
+/dev/dsk/c3t1d0s7	/dev/sdb7
+/dev/dsk/c3t2d0s7	/dev/sdc7
+/dev/dsk/c3t3d0s7	/dev/sdd7
+/dev/dsk/c3t4d0s7	/dev/sde7
+/dev/dsk/c3t5d0s7	/dev/sdf7
