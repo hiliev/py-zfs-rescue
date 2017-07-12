@@ -27,7 +27,7 @@ The ZFS implementation is minimal and incomplete. It is basically in a "works fo
 * support for really large directories (it could be implemented relatively easily)
 * validation of the block checksums -- currently the tool relies on all metadata being compressed and the LZJB decompressor failing with garbled input data
 * LZ4 and GZIP decompression
-* support for pools created on big-endian systmes
+* support for pools created on big-endian systems
 
 There is minimal to no error recovery and encountering an unsupported object will abort the program. This is intentional as it helps easily spot unimplemented features and deviations from the specification.
 
