@@ -61,7 +61,7 @@ id_l.read(0)
 id_l.debug()
 all_disks = id_l.get_vdev_disks()
 
-pool_dev = RaidzDevice(all_disks, 1, BLK_PROXY_ADDR, bad=[3], repair=True, dump_dir=OUTPUT_DIR)
+pool_dev = RaidzDevice(all_disks, 1, BLK_PROXY_ADDR, bad=[3], ashift=id_l._ashift, repair=True, dump_dir=OUTPUT_DIR)
 # pool_dev = MirrorDevice(all_disks, BLK_PROXY_ADDR, dump_dir=OUTPUT_DIR)
 
 print("[+] Loading uberblocks from child vdevs")

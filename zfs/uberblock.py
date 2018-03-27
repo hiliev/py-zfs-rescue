@@ -91,12 +91,13 @@ class UBArray:
     def __init__(self):
         self._blocks = []
 
-    def parse(self, data):
+    def parse(self, data, ashift=9):
         stream = BytesIO(data)
-        num_blocks = len(data) >> 10
+        ushift = max(ashift, 10) # min 1024
+        num_blocks = len(data) >> ushift
         self._blocks = []
         for i in range(num_blocks):
-            block_data = stream.read(1024)
+            block_data = stream.read(1 << ushift)
             ublock = Uberblock()
             ublock.parse(block_data)
             self._blocks.append(ublock)
