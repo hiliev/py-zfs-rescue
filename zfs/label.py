@@ -62,8 +62,9 @@ class Label:
             self._data = self._bp.read(self._vdev, 0, 256*K)
         nvparser = NVPairParser()
         self._nvlist = nvparser.parse(self._data[self.NVLIST_OFFSET:self.NVLIST_OFFSET+self.NVLIST_SIZE][4:])
+        self._ashift = self._nvlist['vdev_tree']['ashift'] if 'vdev_tree' in self._nvlist and 'ashift' in self._nvlist['vdev_tree'] else 9;
         self._ubarray = UBArray()
-        self._ubarray.parse(self._data[self.UBARRAY_OFFSET:self.UBARRAY_OFFSET + self.UBARRAY_SIZE])
+        self._ubarray.parse(self._data[self.UBARRAY_OFFSET:self.UBARRAY_OFFSET + self.UBARRAY_SIZE],ashift=self._ashift)
         self._which = which
 
     def debug(self, show_uberblocks=False):

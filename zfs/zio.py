@@ -57,13 +57,14 @@ class GenericDevice:
             # TODO: Implement gang blocks
             raise NotImplementedError("Gang blocks are still not supported")
         offset = bptr.get_dva(dva).offset
+        asize = bptr.get_dva(dva)._asize
         psize = bptr.psize
         if offset == 0 and psize == 0:
             return None
         lsize = bptr.lsize
         if self._verbose >= LOG_VERBOSE:
-            print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(psize)[2:]))
-        data = self._read_physical(offset, psize, debug_dump, debug_prefix)
+            print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(asize)[2:]))
+        data = self._read_physical(offset, asize, debug_dump, debug_prefix)
         if bptr.compressed:
             if bptr.comp_alg in [1, 3]:
                 if self._verbose >= LOG_VERBOSE:
@@ -114,8 +115,9 @@ class MirrorDevice(GenericDevice):
 
 class RaidzDevice(GenericDevice):
 
-    def __init__(self, child_vdevs, nparity, proxy_addr, bad=None, repair=False, dump_dir="/tmp"):
+    def __init__(self, child_vdevs, nparity, proxy_addr, ashift=9, bad=None, repair=False, dump_dir="/tmp"):
         super().__init__(child_vdevs, proxy_addr, dump_dir=dump_dir)
+        self._ashift = ashift
         self._nparity = nparity
         self._bad = bad
         self._repair = repair
@@ -125,7 +127,7 @@ class RaidzDevice(GenericDevice):
             print("[-] Raidz created with more bad disks than parity allows!")
 
     def _read_physical(self, offset, psize, debug_dump, debug_prefix):
-        (cols, firstdatacol, skipstart) = self._map_alloc(offset, psize, 9)
+        (cols, firstdatacol, skipstart) = self._map_alloc(offset, psize, self._ashift)
         col_data = []
         blockv = []
         for c in range(len(cols)):
