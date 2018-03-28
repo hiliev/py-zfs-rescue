@@ -29,8 +29,10 @@
 
 from block_proxy.proxy import BlockProxy
 from zfs.lzjb import lzjb_decompress
+from zfs.lz4zfs import lz4zfs_decompress
 
 from os import path
+import struct;
 
 LOG_QUIET = 0
 LOG_VERBOSE = 1
@@ -42,7 +44,14 @@ def roundup(x, y):
 
 
 class GenericDevice:
-
+    COMP_TYPE_ON = 1
+    COMP_TYPE_LZJB = 3
+    COMP_TYPE_LZ4 = 15
+    CompType = {
+        COMP_TYPE_ON:   "LZJB",
+        COMP_TYPE_LZJB: "LZJB",
+        COMP_TYPE_LZ4:  "LZ4"
+    }
     def __init__(self, child_devs, block_provider_addr, dump_dir="/tmp"):
         self._devs = child_devs
         self._bp = BlockProxy(block_provider_addr)
@@ -66,11 +75,14 @@ class GenericDevice:
             print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(asize)[2:]))
         data = self._read_physical(offset, asize, debug_dump, debug_prefix)
         if bptr.compressed:
-            if bptr.comp_alg in [1, 3]:
+            if bptr.comp_alg in GenericDevice.CompType:
                 if self._verbose >= LOG_VERBOSE:
-                    print("[+]  Decompressing with LZJB")
+                    print("[+]  Decompressing with %s", GenericDevice.CompType[bptr.comp_alg])
                 try:
-                    data = lzjb_decompress(data, lsize)
+                    if (bptr.comp_alg == GenericDevice.COMP_TYPE_LZ4):
+                        data = lz4zfs_decompress(data, lsize)
+                    else:
+                        data = lzjb_decompress(data, lsize)
                 except:
                     data = None
                 if data is None:
