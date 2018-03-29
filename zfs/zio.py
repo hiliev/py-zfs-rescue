@@ -73,7 +73,11 @@ class GenericDevice:
         lsize = bptr.lsize
         if self._verbose >= LOG_VERBOSE:
             print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(asize)[2:]))
-        data = self._read_physical(offset, asize, debug_dump, debug_prefix)
+        if (bptr._embeded):
+            lsize = bptr._embeded_lsize
+            data = bptr._embeded_data
+        else:
+            data = self._read_physical(offset, asize, debug_dump, debug_prefix)
         if bptr.compressed:
             if bptr.comp_alg in GenericDevice.CompType:
                 if self._verbose >= LOG_VERBOSE:

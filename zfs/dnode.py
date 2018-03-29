@@ -187,6 +187,7 @@ class BonusZnode:
             self.zp_uid, self.zp_gid
         )
 
+DNODE_FLAG_USED_BYTES=(1 << 0)
 
 class DNode:
 
@@ -199,12 +200,13 @@ class DNode:
         self._bonustype = None  # uint8_t 1
         self._checksum = None  # uint8_t 1
         self._compress = None  # uint8_t 1
-        self._pad = None  # uint8_t 1
+        self._flags = None # uint8_t 1
         self._datablkszsec = None  # uint16_t 2
         self._bonuslen = None  # uint16_t 2
+        self._extra_slots = None # uint8_t 1
         self._pad2 = None  # uint8_t[4] 4
         self._maxblkid = None  # uint64_t 8
-        self._secphys = None  # uint64_t 8
+        self._used = None  # uint64_t 8
         self._pad3 = None  # uint64_t[4] 32
         self._blkptr = None  # blkptr_t[N] @64
         self._bonus = None  # uint8_t[BONUSLEN]
@@ -218,9 +220,9 @@ class DNode:
         # Save data for dumping purposes
         self._data = data[:]
         (self._type, self._indblkshift, self._nlevels, self._nblkptr,
-         self._bonustype, self._checksum, self._compress,
-         self._datablkszsec, self._bonuslen, self._maxblkid,
-         self._secphys) = struct.unpack("=7Bx2H4xQQ32x", data[:BLKPTR_OFFSET])
+         self._bonustype, self._checksum, self._compress, self._flags,
+         self._datablkszsec, self._bonuslen, self._extra_slots, self._maxblkid,
+         self._used) = struct.unpack("=8B2HB3xQQ32x", data[:BLKPTR_OFFSET])
         if self._type == 0:
             return
         # Object type > 100 (or even 53) is probably due to data error
@@ -232,6 +234,7 @@ class DNode:
             # More than three block pointers is a sign of data error
             self._invalidate()
             return
+        self._used = self._used << 9 if not self._flags & DNODE_FLAG_USED_BYTES else self._used;
         self._datablksize = self._datablkszsec << 9
         ptr = BLKPTR_OFFSET
         for bn in range(self._nblkptr):
