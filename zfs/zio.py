@@ -262,3 +262,16 @@ class RaidzDevice(GenericDevice):
                 rm_skipstart = 1
 
         return rm_cols, rm_firstdatacol, rm_skipstart
+
+def dumppacket(data):
+    l = roundup(len(data),32)//32
+    for i in range(l):
+        e = min(len(data),(i+1)*32)
+        ln = data[i*32:e]
+        f = 32-len(ln);
+        def isprint(c):
+            return (c >= 0x21 and c <= 0x7e)
+        print("%04x: %s" %(i*32,"".join(
+            [ ("%02x " %(j)) for j in ln ] + (["   "]*f) +
+            [ ("%c" %(c)) if isprint(c) else "." for c in ln ] + ([" "]*f)
+        )))

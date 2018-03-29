@@ -28,6 +28,8 @@
 
 
 from zfs.blockptr import BlockPtrArray
+from zfs.zio import dumppacket
+from zfs.dnode import BLKPTR_OFFSET
 import struct
 
 MZAP_ENT_LEN = 64
@@ -150,6 +152,8 @@ class FatZap:
         ]
         fmt = ' '.join(f+"={}" for f in fields)
         print("[+]  Fat Zap header:", fmt.format(*zpt))
+        if (zpt[3] == 0): # embedded zap ptrtable
+            self._embedptrs= data[self._dbsize//2:self._dbsize]; # not used but extract anyway
         block_size = self._dbsize
         nblocks = (len(data) - block_size) // block_size
         for n in range(1, nblocks+1):
@@ -194,7 +198,10 @@ class FatZap:
             # TODO: Implement extraction of arrays
             # For now assume values are single qwords
             name = safe_decode_string(name_data)
-            value = struct.unpack(">Q", value_data)[0]
+            if not len(value_data) == 8:
+                value = value_data
+            else:
+                value = struct.unpack(">Q", value_data)[0]
             self._entries[name] = value
             if next_chunk != 0xffff:
                 self._follow_collision_chain(chunk_arr, next_chunk)
@@ -215,30 +222,7 @@ class FatZap:
     def __getitem__(self, item):
         return self._entries.get(item)
 
-
-def _simple_zap_factory(vdev, bptr):
-    data = vdev.read_block(bptr)
-    if data is None:
-        return None
-    (block_type,) = struct.unpack("=Q", data[:8])
-    # Single-block ZAPs are not supposed to be fat?
-    if block_type != ZBT_MICRO:
-        print("[-]  Single-block ZAP - expected a Micro Zap, got", hex(block_type))
-        return None
-    zap = MicroZap()
-    zap.parse(data)
-    return zap
-
-
-def _indirect_zap_factory(vdev, bptr, dbsize, nblocks):
-    data = vdev.read_block(bptr)
-    if data is None:
-        return None
-    # Data contains first indirection block
-    bpa = BlockPtrArray(data)
-    data = bytearray()
-    for i in range(nblocks):
-        data += vdev.read_block(bpa[i])
+def _choose_zap_factory(data, dbsize):
     (block_type,) = struct.unpack("=Q", data[:8])
     if block_type == ZBT_MICRO:
         zap = MicroZap()
@@ -250,13 +234,30 @@ def _indirect_zap_factory(vdev, bptr, dbsize, nblocks):
     zap.parse(data)
     return zap
 
+def _blockptrar_zap_factory(vdev, bpa, dbsize, nblocks):
+    data = bytearray()
+    for i in range(nblocks):
+        d = vdev.read_block(bpa[i])
+        if not (d is None):
+            data += d
+    return _choose_zap_factory(data, dbsize)
 
+def _indirect_zap_factory(vdev, bptr, dbsize, nblocks):
+    data = vdev.read_block(bptr)
+    if data is None:
+        return None
+    # Data contains first indirection block
+    bpa = BlockPtrArray(data)
+    return _blockptrar_zap_factory(vdev, bpa, dbsize, nblocks)
+    
 def zap_factory(vdev, dnode):
     bptr = dnode.blkptrs[0]
+    dbsize = dnode.datablksize
     if dnode.levels == 1:
-        return _simple_zap_factory(vdev, bptr)
+        nblocks = dnode._nblkptr
+        bpa = BlockPtrArray(dnode._data[BLKPTR_OFFSET:BLKPTR_OFFSET+nblocks*128])
+        return _blockptrar_zap_factory(vdev, bpa, dbsize, nblocks)
     elif dnode.levels == 2:
-        dbsize = dnode.datablksize
         return _indirect_zap_factory(vdev, bptr, dbsize, dnode.maxblkid+1)
     # TODO: Implement Fat Zap with BlockTree
     raise NotImplementedError("Deeper ZAPs not supported yet")
