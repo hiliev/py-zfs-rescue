@@ -227,8 +227,11 @@ class DNode:
             return
         # Object type > 100 (or even 53) is probably due to data error
         elif self._type > 100:
-            self._invalidate()
-            return
+            if self._type==196: # on linux 196 is "zap" with "bonustype dataset"
+                pass
+            else:
+                self._invalidate()
+                return
         self._blkptr = []
         if self._nblkptr > 3:
             # More than three block pointers is a sign of data error
@@ -292,7 +295,10 @@ class DNode:
         elif self._type == 0:
             return "<unallocated dnode>"
         try:
-            dmu_type = DMU_TYPE_DESC[self._type]
+            if self._type == 196:
+                dmu_type = "zap"
+            else:
+                dmu_type = DMU_TYPE_DESC[self._type]
         except IndexError:
             dmu_type = "unk_{}".format(self._type)
         bptrs = " ".join(["blkptr[{}]={}".format(i, v) for i, v in enumerate(self._blkptr)])

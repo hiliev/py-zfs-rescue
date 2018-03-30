@@ -31,6 +31,7 @@
 
 from block_proxy.proxy import BlockProxy
 from zfs.label import Label
+from zfs.zap import zap_factory
 from zfs.dataset import Dataset
 from zfs.objectset import ObjectSet
 from zfs.zio import RaidzDevice             # or MirrorDevice
@@ -103,6 +104,25 @@ for dva in range(3):
         if d and d.type == 16:
             datasets[n] = d
 
+print("[+] add one level of child datasets")
+try:
+    rds_z = mos[1]
+    rds_zap = zap_factory(pool_dev, rds_z)
+    rds_id = rds_zap['root_dataset']
+    rdir = mos[rds_id]
+    cdzap_id = rdir.bonus.dd_child_dir_zapobj
+    cdzap_z = mos[cdzap_id]
+    cdzap_zap = zap_factory(pool_dev, cdzap_z)
+    for k,v in cdzap_zap._entries.items():
+        if not k[0:1] == '$': 
+            child = mos[v]
+            cds = child.bonus.dd_head_dataset_obj
+            print("[+] child %s with dataset %d" %(k,cds))
+            # mos[cds] points to a 'zap' with "bonus  DSL dataset"
+            datasets[cds] = mos[cds]
+except:
+    pass
+    
 print("[+] {} datasets found".format(len(datasets)))
 
 for dsid in datasets:
