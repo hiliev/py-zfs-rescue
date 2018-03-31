@@ -30,11 +30,12 @@
 import struct
 from zfs.obj_desc import *
 
+VERBOSE_EMBED=False
 
 class DVA:
 
     def __init__(self, qword0, qword1):
-        self._asize = (1 + (qword0 & 0xffffff)) << 9
+        self._asize = (qword0 & 0xffffff) << 9
         self._grid = (qword0 >> 24) & 0xff
         self._vdev = (qword0 >> 32)
         self._offset = (qword1 & 0x7fffffffffffffff) << 9
@@ -49,7 +50,7 @@ class DVA:
 
     @property
     def null(self):
-        return (self._vdev == 0) and (self._offset == 0)
+        return (self._vdev == 0) and (self._offset == 0) 
 
     @property
     def gang(self):
@@ -69,6 +70,7 @@ class BlockPtr:
         self._lsize = None
         self._psize = None
         self._comp = None
+        self._embeded = None
         self._cksum = None
         self._type = None
         self._lvl = None
@@ -76,6 +78,7 @@ class BlockPtr:
         self._birth_txg = None
         self._fill_count = None
         self._checksum = None
+        self._encrypted = None
         if data is not None:
             self.parse(data)
 
@@ -86,13 +89,31 @@ class BlockPtr:
         self._dva2 = DVA(qwords[4], qwords[5])
         self._lsize = (1 + (qwords[6] & 0xffff)) << 9
         self._psize = (1 + ((qwords[6] >> 16) & 0xffff)) << 9
-        self._comp = (qwords[6] >> 32) & 0xff
+        self._comp = (qwords[6] >> 32) & 0x7f
+        self._embeded = (qwords[6] >> 39) & 0x1
         self._cksum = (qwords[6] >> 40) & 0xff
         self._type = (qwords[6] >> 48) & 0xff
         self._lvl = (qwords[6] >> 56) & 0x7f
+        self._encrypted = (qwords[6] >> 61) & 0x1;
         self._E = qwords[6] >> 63
         self._birth_txg = qwords[10]
         self._fill_count = qwords[11]
+        if self._embeded:
+            self._dva0 = self._dva0 = DVA(0, 0)
+            self._dva1 = self._dva0 = DVA(0, 0)
+            self._dva2 = self._dva0 = DVA(0, 0)
+            self._embeded_lsize = (qwords[6]) & 0x1ffffff
+            self._embeded_data = data[0:(6*8)] + data[(7*8):(10*8)] + data[(11*8):(16*8)]
+            self._etype = (qwords[6] >> 40) & 0xff
+            self._psize = (qwords[6] >> 25) & 0x7f
+            self._lsize = self._embeded_lsize
+            if VERBOSE_EMBED:
+                print("[E]: zdb -E %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x | xxd" %(
+                    qwords[0], qwords[1], qwords[2], qwords[3],
+                    qwords[4], qwords[5], qwords[6], qwords[7],
+                    qwords[8], qwords[9], qwords[10], qwords[11],
+                    qwords[12], qwords[13], qwords[14], qwords[15]));
+
 
     def get_dva(self, dvanum):
         if dvanum == 0:

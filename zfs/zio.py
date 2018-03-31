@@ -73,7 +73,11 @@ class GenericDevice:
         lsize = bptr.lsize
         if self._verbose >= LOG_VERBOSE:
             print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(asize)[2:]))
-        data = self._read_physical(offset, asize, debug_dump, debug_prefix)
+        if (bptr._embeded):
+            lsize = bptr._embeded_lsize
+            data = bptr._embeded_data
+        else:
+            data = self._read_physical(offset, asize, debug_dump, debug_prefix)
         if bptr.compressed:
             if bptr.comp_alg in GenericDevice.CompType:
                 if self._verbose >= LOG_VERBOSE:
@@ -258,3 +262,16 @@ class RaidzDevice(GenericDevice):
                 rm_skipstart = 1
 
         return rm_cols, rm_firstdatacol, rm_skipstart
+
+def dumppacket(data):
+    l = roundup(len(data),32)//32
+    for i in range(l):
+        e = min(len(data),(i+1)*32)
+        ln = data[i*32:e]
+        f = 32-len(ln);
+        def isprint(c):
+            return (c >= 0x21 and c <= 0x7e)
+        print("%04x: %s" %(i*32,"".join(
+            [ ("%02x " %(j)) for j in ln ] + (["   "]*f) +
+            [ ("%c" %(c)) if isprint(c) else "." for c in ln ] + ([" "]*f)
+        )))

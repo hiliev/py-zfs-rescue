@@ -30,6 +30,7 @@
 from zfs.objectset import ObjectSet
 from zfs.zap import zap_factory, TYPECODES, safe_decode_string
 from zfs.blocktree import BlockTree
+from zfs.sa import SystemAttr
 from zfs.fileobj import FileObj
 
 import csv
@@ -72,6 +73,13 @@ class Dataset(ObjectSet):
             self._rootdir_id = z["ROOT"]
             if self._rootdir_id is None:
                 z.debug()
+            
+            # try load System Attribute Layout and registry:
+            try:
+                self._sa = SystemAttr(self._vdev, self, z["SA_ATTRS"]);
+            except Exception as e:
+                print("[-] Unable to parse System Attribute tables: %s" %(str(e)))   
+
         if self._rootdir_id is None:
             print("[-]  Root directory ID is not in master node")
             return
