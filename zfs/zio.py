@@ -77,7 +77,10 @@ class GenericDevice:
             lsize = bptr._embeded_lsize
             data = bptr._embeded_data
         else:
-            data = self._read_physical(offset, asize, debug_dump, debug_prefix)
+            rsize = psize
+            if psize < (1 << self._ashift):
+                rsize = 1 << self._ashift
+            data = self._read_physical(offset, rsize, debug_dump, debug_prefix)
         if bptr.compressed:
             if bptr.comp_alg in GenericDevice.CompType:
                 if self._verbose >= LOG_VERBOSE:
@@ -112,8 +115,9 @@ class GenericDevice:
 
 class MirrorDevice(GenericDevice):
 
-    def __init__(self, child_vdevs, proxy_addr, bad=None, dump_dir="/tmp"):
+    def __init__(self, child_vdevs, proxy_addr, ashift=9, bad=None, dump_dir="/tmp"):
         super().__init__(child_vdevs, proxy_addr, dump_dir=dump_dir)
+        self._ashift = ashift
         self._bad = bad
         if self._bad and len(self._bad) > len(self._devs):
             print("[-] Mirror created with more bad disks than copies!")
