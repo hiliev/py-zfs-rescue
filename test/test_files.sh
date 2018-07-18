@@ -6,4 +6,4 @@ fi
 
 d=$(pwd)
 cd ..;
-python3 zfs_rescue.py -v --files=${d}/datatab.txt --label=/dev/loop0
+python3 zfs_rescue.py -v -C --files=${d}/datatab.txt --label=/dev/loop0

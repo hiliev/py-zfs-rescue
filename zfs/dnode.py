@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import struct
+import struct, datetime
 
 from zfs.blockptr import BlockPtr
 from zfs.obj_desc import DMU_TYPE_DESC
@@ -156,6 +156,14 @@ class BonusZnode:
 
     def size(self):
         return self.zp_size
+    def mtime(self):
+        return self.zp_mtime
+    def mode(self):
+        return self.zp_mode
+    def uid(self):
+        return self.zp_uid
+    def gid(self):
+        return self.zp_gid
     
     def __str__(self):
         fields = [
@@ -240,6 +248,17 @@ class BonusSysAttr:
         
     def size(self):
         return self.zpl_size
+    def mtime(self):
+        try:
+            return self.zpl_mtime[0]
+        except:
+            return datetime.datetime.now().timestamp()
+    def mode(self):
+        return self.zpl_mode
+    def uid(self):
+        return self.zpl_uid
+    def gid(self):
+        return self.zpl_gid
 
     def __str__(self):
         pass
