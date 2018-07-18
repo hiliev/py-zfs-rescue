@@ -312,8 +312,8 @@ class DNode:
     def from_bptr(vdev, bptr, dvas=(0, 1)):
         data = None
         for dva in dvas:
-            data = vdev.read_block(bptr, dva=dva)
-            if data:
+            data,c = vdev.read_block(bptr, dva=dva)
+            if data and c:
                 break
         if data is None:
             return None

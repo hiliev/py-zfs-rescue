@@ -96,8 +96,8 @@ class ObjectSet:
             bp = self._blocktree[blockid]
             if bp is not None:
                 for dva in range(3):
-                    block_data = self._vdev.read_block(bp, dva=dva)
-                    if block_data:
+                    block_data,c = self._vdev.read_block(bp, dva=dva)
+                    if block_data and c:
                         break
             self._block_cache[blockid] = block_data
         if block_data is None:
