@@ -154,6 +154,9 @@ class BonusZnode:
         ) = struct.unpack("=18Q", data[:18*8])
         self.zp_inline_content = data[264:]
 
+    def size(self):
+        return self.zp_size
+    
     def __str__(self):
         fields = [
             'zp_atime', 'zp_atime_ns',
@@ -187,11 +190,65 @@ class BonusZnode:
             self.zp_uid, self.zp_gid
         )
 
+class BonusSysAttr:
+    def __init__(self, objset, data):
+        if objset is None:
+            return;
+        try:
+            SA_MAGIC=0x2F505A
+            (magic,layoutid,hdrsz,l) = struct.unpack("=IBBH",data[0:8])
+            if not (magic == SA_MAGIC):
+                print("[-] Error: SA_MAGIC wrong")
+            hdrsz *= 2
+            if layoutid == 3:
+                print("Symlink")
+            lenidx = 0
+            if (hdrsz < 8):
+                hdrsz = 8
+            ptr = hdrsz
+            #ptr = 8 #skip sa_hdr_phys_t
+            for f in objset._sa._lay[str(layoutid)]:
+                l = f['len']
+                b = data[ptr:ptr+l]
+                v = None
+                if (l == 16):
+                    (v0,v1) = struct.unpack("=QQ",b)
+                    v = [v0,v1];
+                elif (l == 8):
+                    v, = struct.unpack("=Q",b)
+                elif (l == 4):
+                    v, = struct.unpack("=I",b)
+                elif (l == 0):
+                    l, = struct.unpack("=H",data[6+lenidx*2:6+lenidx*2+2])
+                    lenidx += 1
+                    if (f['name'] == "zpl_dacl_aces"):
+                        pass
+                    elif (f['name'] == "zpl_symlink"):
+                        v = data[ptr:ptr+l]
+                        #ptr = len(data)
+                ptr += l
+                setattr(self,f['name'], v);
+                n = f['name'].replace("zpl_","zp_");
+                setattr(self,n, v);
+            
+            self.zp_inline_content = None
+            #ZFS_OLD_ZNODE_PHYS_SIZE=0x108
+            #if (len(data) > ZFS_OLD_ZNODE_PHYS_SIZE):
+            self.zp_inline_content = data[ptr:]
+        except:
+            pass
+        
+    def size(self):
+        return self.zpl_size
+
+    def __str__(self):
+        pass
+    
 DNODE_FLAG_USED_BYTES=(1 << 0)
 
 class DNode:
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, objset=None):
         self._data = None
         self._type = None  # uint8_t 1
         self._indblkshift = None  # uint8_t 1
@@ -211,6 +268,7 @@ class DNode:
         self._blkptr = None  # blkptr_t[N] @64
         self._bonus = None  # uint8_t[BONUSLEN]
         self._datablksize = None
+        self._objset = objset
         if data is not None:
             self.parse(data)
 
@@ -251,6 +309,8 @@ class DNode:
             self._bonus = BonusDataset(bonus_data)
         elif self._bonuslen and self._bonustype == 17:
             self._bonus = BonusZnode(bonus_data)
+        elif self._bonuslen and self._bonustype == 0x2c:
+            self._bonus = BonusSysAttr(self._objset, bonus_data)
         else:
             self._bonus = bonus_data
 
@@ -309,7 +369,7 @@ class DNode:
                                              self._nlevels, 1 << self._indblkshift, bptrs, bonus)
 
     @staticmethod
-    def from_bptr(vdev, bptr, dvas=(0, 1)):
+    def from_bptr(vdev, bptr, dvas=(0, 1), objset=None):
         data = None
         for dva in dvas:
             data,c = vdev.read_block(bptr, dva=dva)
@@ -317,6 +377,6 @@ class DNode:
                 break
         if data is None:
             return None
-        dn = DNode()
+        dn = DNode(objset=objset)
         dn.parse(data)
         return dn
