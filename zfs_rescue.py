@@ -112,7 +112,7 @@ datasets = {}
 
 # Try all copies of the MOS
 for dva in range(3):
-    mos = ObjectSet(pool_dev, root_blkptr, dva=dva)
+    mos = ObjectSet(pool_dev, root_blkptr, dvas=(dva,))
     for n in range(len(mos)):
         d = mos[n]
         # print("[+]  dnode[{:>3}]={}".format(n, d))
@@ -155,7 +155,7 @@ for dsid in datasets:
         ddss.export_file_list(path.join(OUTPUT_DIR, "ds_{}_filelist.csv".format(dsid)))
 
 for dsid in DS_TO_ARCHIVE:
-    ddss = Dataset(pool_dev, datasets[dsid], dva=1)
+    ddss = Dataset(pool_dev, datasets[dsid], dvas=(0,1))
     ddss.analyse()
     # ddss.prefetch_object_set()
     if len(DS_OBJECTS) > 0:

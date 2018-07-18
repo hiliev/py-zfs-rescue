@@ -51,8 +51,8 @@ MODE_OX = 0o001
 
 class Dataset(ObjectSet):
 
-    def __init__(self, vdev, os_dnode, dva=0):
-        super().__init__(vdev, os_dnode.bonus.bptr, dva=dva)
+    def __init__(self, vdev, os_dnode, dvas=(0,1)):
+        super().__init__(vdev, os_dnode.bonus.bptr, dvas=dvas)
         self._rootdir_id = None
 
     def analyse(self):

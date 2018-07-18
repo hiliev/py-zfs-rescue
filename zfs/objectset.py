@@ -33,10 +33,10 @@ from zfs.blocktree import BlockTree
 
 class ObjectSet:
 
-    def __init__(self, vdev, os_bptr, dva=0):
+    def __init__(self, vdev, os_bptr, dvas=(0,1)):
         self._vdev = vdev
         # Load the object set dnode
-        self._dnode = self._load_os_dnode(os_bptr, dva)
+        self._dnode = self._load_os_dnode(os_bptr, dvas)
         if self._dnode is None:
             print("[-] Object set dnode is unreachable")
             self._broken = True
@@ -77,9 +77,9 @@ class ObjectSet:
     def dnodes_per_block(self):
         return self._dnodes_per_block
 
-    def _load_os_dnode(self, os_bptr, dva):
+    def _load_os_dnode(self, os_bptr, dvas):
         print("[+] Loading object set dnode from", os_bptr)
-        return DNode.from_bptr(self._vdev, os_bptr, dvas=(dva,), objset=self)
+        return DNode.from_bptr(self._vdev, os_bptr, dvas=dvas, objset=self)
 
     def __getitem__(self, item):
         return self._get_dnode(item)
