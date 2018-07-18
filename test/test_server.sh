@@ -20,6 +20,6 @@ chmod a+rwx /tmp/_server_start.sh
 sudo bash /tmp/_server_start.sh
 
 sleep 1
-python3 ../zfs_rescue.py --label=/dev/loop0
+python3 ../zfs_rescue.py -v --label=/dev/loop0
 
 pkill -9 -f server.py

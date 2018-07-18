@@ -35,6 +35,8 @@ from zfs.zap import zap_factory
 from zfs.dataset import Dataset
 from zfs.objectset import ObjectSet
 from zfs.zio import RaidzDevice             # or MirrorDevice
+from zfs.blocktree import BlockTree
+
 import argparse
 
 from os import path
@@ -46,6 +48,9 @@ parser.add_argument('--files', '-f', dest='files', type=str, default=None,
 parser.add_argument('--label', '-l', dest='label', type=str, default='/dev/dsk/c3t0d0s7',
                     help='Device where to read the initial label from')
 args = parser.parse_args()
+
+if args.verbose > 0:
+    BlockTree.VERBOSE_TRAVERSE = 1
 
 BLK_PROXY_ADDR = ("localhost", 24892)       # network block server
 if not args.files is None:
