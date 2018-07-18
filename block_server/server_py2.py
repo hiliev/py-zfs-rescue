@@ -45,16 +45,20 @@ trans_table = {}
 verbose = False
 
 class BlockTCPHandler(BaseRequestHandler):
+
+    def read_len(self,l):
+        buf = bytearray()
+        while (len(buf) < l):
+            buf += self.request.recv(1)
+        return buf
+    
     """
     Request handler for the block server
     """
     def handle(self):
-        cmd = self.request.recv(1024)
-        if len(cmd) < 18:
-            print "[-] Block Server: invalid request"
-            return
-        (op, offset, count) = struct.unpack('=BQQ', cmd[:17])
-        path = cmd[17:].decode('utf8')
+        cmd = self.read_len(1+1+8+8+1)
+        (op, pad, offset, count, pathlen) = struct.unpack('=BBQQB', cmd)
+        path = self.read_len(pathlen).decode('utf8')
         if path in trans_table.keys():
             path = trans_table[path]
         if verbose:
@@ -65,7 +69,9 @@ class BlockTCPHandler(BaseRequestHandler):
         f.close()
         if verbose:
             print "[+]  read %d bytes" % (len(data),)
+        self.request.sendall(struct.pack('=BQQ', ord('n'), offset, count)) # 'n' next packet
         self.request.sendall(data)
+        self.request.sendall(struct.pack('=BQQ', ord('l'), offset, count)) # 'l' last 
 
 
 def populate_trans_table():

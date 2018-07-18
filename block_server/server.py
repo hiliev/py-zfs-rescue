@@ -36,67 +36,88 @@ Provides remote clients with access to the local disks.
 """
 
 from socketserver import TCPServer, BaseRequestHandler
-import struct
+import struct, socket
+import argparse
 
 SERVER_ADDRESS = "localhost"
 SERVER_PORT = 24892
 
 trans_table = {}
-verbose = False
+verbose = 0
 
+CHUNKSIZE=(4096*64)
 
 class BlockTCPHandler(BaseRequestHandler):
+
+    def read_len(self,l):
+        buf = bytearray()
+        while (len(buf) < l):
+            buf += self.request.recv(1)
+        return buf
+    
     """
     Request handler for the block server
     """
     def handle(self):
-        cmd = self.request.recv(1024)
-        if len(cmd) < 18:
-            print("[-] Block Server: invalid request")
-            return
+        cmd = self.read_len(1)
         op = cmd[0]
-        if op == 1:
+        if op == ord('r'):
             self.handle_read_block(cmd)
-        elif op == 2:
+        elif op == ord('v'):
             self.handle_read_blockv(cmd)
+        else:
+            print("[-] Block Server: invalid request %s" %(str(op)) )
 
     def handle_read_block(self, cmd):
-        (op, offset, count) = struct.unpack('=BQQ', cmd[:17])
-        path = cmd[17:].decode('utf8')
-        data = self._do_read(path, offset, count)
-        self.request.sendall(data)
+        cmd = self.read_len(1+8+8+1)
+        pad, offset, count, pathlen = struct.unpack('=BQQB', cmd)
+        path = self.read_len(pathlen).decode('utf8')
+        self._do_read(path, offset, count)
 
     def handle_read_blockv(self, cmd):
-        (op, nreqs) = struct.unpack('=BB', cmd[:2])
-        ptr = 2
-        data = bytearray()
+        cmd = self.read_len(1)
+        nreqs, = struct.unpack('=B', cmd)
         for n in range(nreqs):
-            (offset, count, pathlen) = struct.unpack('=QQB', cmd[ptr:ptr+17])
-            ptr += 17
-            path = cmd[ptr:ptr+pathlen].decode('utf8')
-            ptr += pathlen
-            data += self._do_read(path, offset, count)
-        self.request.sendall(data)
+            cmd = self.read_len(8+8+1)
+            (offset, count, pathlen) = struct.unpack('=QQB', cmd)
+            path = self.read_len(pathlen).decode('utf8')
+            self._do_read(path, offset, count)
 
-    @staticmethod
-    def _do_read(path, offset, count):
+    def _do_read(self, path, offset, count):
         if path in trans_table.keys():
             path = trans_table[path]
         if verbose:
             print("[+] Block server: {} -- {}/{}".format(path, offset, count))
-        f = open(path, 'rb')
-        f.seek(offset)
-        data = f.read(count)
-        f.close()
+        try:
+            f = open(path, 'rb')
+
+            f.seek(0,2)
+            sz = f.tell();
+            if verbose:
+                print(("disk size: %d" % (sz)))
+            
+            i = 0;
+            while i < count:
+                l = min(count-i, CHUNKSIZE)
+                f.seek(offset)
+                data = f.read(l)
+                self.request.sendall(struct.pack('=BQQ', ord('n'), offset, len(data))) # 'n' next packet
+                self.request.sendall(data)
+                i += l
+                offset += l
+            f.close()
+        except Exception as e:
+            if verbose:
+                print(str(e))
+            self.request.sendall(struct.pack('=BQQ', ord('e'), offset, 0 )) # 'e' error
+        self.request.sendall(struct.pack('=BQQ', ord('l'),offset, count)) # 'l' last 
         if verbose:
-            print("[+]  Read {} bytes".format(len(data)))
-        return data
+            print("[+]  Read {} bytes".format(i))
 
-
-def populate_trans_table():
+def populate_trans_table(args):
     global trans_table
     try:
-        f = open('disks.tab', 'r')
+        f = open(args.config, 'r')
         entries = [l.strip() for l in f.readlines() if l[0] != '#']
         f.close()
         for entry in entries:
@@ -105,8 +126,15 @@ def populate_trans_table():
     except:
         pass
 
-
 if __name__ == "__main__":
-    populate_trans_table()
+    parser = argparse.ArgumentParser(description='block server')
+    parser.add_argument('--verbose', '-v', dest='verbose', action='count', default=0)
+    parser.add_argument('--config', '-c', dest='config', type=str, default="disks.tab",
+                        help='Configuration file in json format, default disks.tab')
+    args = parser.parse_args()
+    verbose = args.verbose
+    
+    populate_trans_table(args)
+    TCPServer.allow_reuse_address = True
     server = TCPServer((SERVER_ADDRESS, SERVER_PORT), BlockTCPHandler)
     server.serve_forever()

@@ -35,13 +35,23 @@ from zfs.zap import zap_factory
 from zfs.dataset import Dataset
 from zfs.objectset import ObjectSet
 from zfs.zio import RaidzDevice             # or MirrorDevice
+import argparse
 
 from os import path
 
-BLK_PROXY_ADDR = ("localhost", 24892)       # network block server
-# BLK_PROXY_ADDR = ("files:", "disks.tab")  # local device nodes
+parser = argparse.ArgumentParser(description='zfs_rescue')
+parser.add_argument('--verbose', '-v', dest='verbose', action='count', default=0)
+parser.add_argument('--files', '-f', dest='files', type=str, default=None,
+                    help='Read blocks from files, specify disks.tab location')
+parser.add_argument('--label', '-l', dest='label', type=str, default='/dev/dsk/c3t0d0s7',
+                    help='Device where to read the initial label from')
+args = parser.parse_args()
 
-BLK_INITIAL_DISK = "/dev/dsk/c3t0d0s7"      # device to read the label from
+BLK_PROXY_ADDR = ("localhost", 24892)       # network block server
+if not args.files is None:
+    BLK_PROXY_ADDR = ("files:", args.files)  # local device nodes
+BLK_INITIAL_DISK = args.label      # device to read the label from
+
 TXG = -1                                    # select specific transaction or -1 for the active one
 
 TEMP_DIR = "/tmp"
