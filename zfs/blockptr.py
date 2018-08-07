@@ -50,7 +50,7 @@ class DVA:
 
     @property
     def null(self):
-        return (self._vdev == 0) and (self._offset == 0) 
+        return (self._vdev == 0) and (self._offset == 0) and (self._asize == 0)
 
     @property
     def gang(self):
@@ -98,6 +98,7 @@ class BlockPtr:
         self._E = qwords[6] >> 63
         self._birth_txg = qwords[10]
         self._fill_count = qwords[11]
+        self._checksum = qwords[12:16]
         if self._embeded:
             self._dva0 = self._dva0 = DVA(0, 0)
             self._dva1 = self._dva0 = DVA(0, 0)
@@ -143,7 +144,7 @@ class BlockPtr:
 
     @property
     def empty(self):
-        return self._dva0.null
+        return self._dva0.null and self._dva1.null and self._dva2.null and not self._embeded
 
     def __str__(self):
         if self.empty:
@@ -161,6 +162,11 @@ class BlockPtr:
             comp = COMP_DESC[self._comp]
         except IndexError:
             comp = "unk_{}".format(self._comp)
+        if self._embeded:
+            return "<[L{} {}] {}L/{}P embedded={} birth={} {} {} {} {} fill={}>".format(
+            self._lvl, dmu_type, hex(self._lsize)[2:], hex(self._psize)[2:],
+            self._embeded_lsize, self._birth_txg, cksum, comp, ENDIAN_DESC[self._E], gang,
+            self._fill_count)
         return "<[L{} {}] {}L/{}P DVA[0]={} DVA[1]={} DVA[2]={} birth={} {} {} {} {} fill={}>".format(
             self._lvl, dmu_type, hex(self._lsize)[2:], hex(self._psize)[2:],
             self._dva0, self._dva1, self._dva2,
@@ -181,3 +187,21 @@ class BlockPtrArray:
 
     def __getitem__(self, item):
         return self._bptrs[item]
+
+def fletcher4(data):
+    l = len(data)
+    e = ( 4 - (l % 4) ) % 4;
+    if (e > 0):
+        data = data + ([0]*e);
+        l += e
+    a = 0
+    b = 0
+    c = 0
+    d = 0
+    for i in range(l//4):
+        v, = struct.unpack("<I",data[i*4:(i+1)*4])
+        a += v
+        b += a
+        c += b
+        d += c
+    return (a&0xffffffffffffffff,b&0xffffffffffffffff,c&0xffffffffffffffff,d&0xffffffffffffffff)

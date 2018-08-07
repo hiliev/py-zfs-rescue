@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+from zfs.blockptr import fletcher4
 from block_proxy.proxy import BlockProxy
 from zfs.lzjb import lzjb_decompress
 from zfs.lz4zfs import lz4zfs_decompress
@@ -38,6 +39,7 @@ LOG_QUIET = 0
 LOG_VERBOSE = 1
 LOG_NOISY = 5
 
+DO_CHKSUM = 1
 
 def roundup(x, y):
     return ((x + y - 1) // y) * y
@@ -62,6 +64,9 @@ class GenericDevice:
         self._verbose = level
 
     def read_block(self, bptr, dva=0, debug_dump=False, debug_prefix="block"):
+        cksum=True
+        if bptr.empty:
+            return None,False
         if bptr.get_dva(dva).gang:
             # TODO: Implement gang blocks
             raise NotImplementedError("Gang blocks are still not supported")
@@ -69,7 +74,7 @@ class GenericDevice:
         asize = bptr.get_dva(dva)._asize
         psize = bptr.psize
         if offset == 0 and psize == 0:
-            return None
+            return None,cksum
         lsize = bptr.lsize
         if self._verbose >= LOG_VERBOSE:
             print("[+] Reading block at {}:{}".format(hex(offset)[2:], hex(asize)[2:]))
@@ -81,6 +86,14 @@ class GenericDevice:
             if psize < (1 << self._ashift):
                 rsize = 1 << self._ashift
             data = self._read_physical(offset, rsize, debug_dump, debug_prefix)
+
+            if bptr._cksum == 7 and DO_CHKSUM:
+                a,b,c,d = fletcher4(data[0:psize])
+                if not (a == bptr._checksum[0] and b == bptr._checksum[1] and c == bptr._checksum[2] and d == bptr._checksum[3]):
+                    print("expect:%016x:%016x:%016x:%016x" %(bptr._checksum[0],bptr._checksum[1],bptr._checksum[2],bptr._checksum[3]))
+                    print("got   :%016x:%016x:%016x:%016x" %(a,b,c,d))
+                    cksum=False
+
         if bptr.compressed:
             if bptr.comp_alg in GenericDevice.CompType:
                 if self._verbose >= LOG_VERBOSE:
@@ -95,19 +108,21 @@ class GenericDevice:
                 if data is None:
                     if self._verbose >= LOG_VERBOSE:
                         print("[-]   Decompression failed")
-                    return None
+                    return None,cksum
             else:
                 if self._verbose >= LOG_VERBOSE:
                     print("[-]  Unsupported compression algorithm")
-                return None
+                return None,cksum
                 # data = lz4.frame.decompress(data)
-            if len(data) < lsize:
-                data += b'\0' * (lsize - len(data))
         if debug_dump:
             f = open(path.join(self._dump_dir, "{}.raw".format(debug_prefix)), "wb")
             f.write(data)
             f.close()
-        return data
+        if len(data) < lsize:
+            data += b'\0' * (lsize - len(data))
+        elif len(data) > lsize:
+            data = data[0:lsize]
+        return data,cksum
 
     def _read_physical(self, offset, psize, debug_dump, debug_prefix):
         raise RuntimeError("Attempted read from generic device!")
@@ -147,6 +162,9 @@ class RaidzDevice(GenericDevice):
             print("[-] Raidz created with more bad disks than parity allows!")
 
     def _read_physical(self, offset, psize, debug_dump, debug_prefix):
+        if offset > 8*1024*1024*1024*1024: # 3tb, unrealistic
+            print ("[-] offset limit reached %d" %(offset))
+            return None
         (cols, firstdatacol, skipstart) = self._map_alloc(offset, psize, self._ashift)
         col_data = []
         blockv = []

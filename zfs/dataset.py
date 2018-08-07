@@ -32,6 +32,7 @@ from zfs.zap import zap_factory, TYPECODES, safe_decode_string
 from zfs.blocktree import BlockTree
 from zfs.sa import SystemAttr
 from zfs.fileobj import FileObj
+from zfs.col import color
 
 import csv
 import time
@@ -51,8 +52,8 @@ MODE_OX = 0o001
 
 class Dataset(ObjectSet):
 
-    def __init__(self, vdev, os_dnode, dva=0):
-        super().__init__(vdev, os_dnode.bonus.bptr, dva=dva)
+    def __init__(self, vdev, os_dnode, dvas=(0,1)):
+        super().__init__(vdev, os_dnode.bonus.bptr, dvas=dvas)
         self._rootdir_id = None
 
     def analyse(self):
@@ -165,8 +166,8 @@ class Dataset(ObjectSet):
                     print("[-]  Broken block tree")
                     bad_block = True
                 else:
-                    block_data = self._vdev.read_block(bp, dva=0)
-                    if block_data is None:
+                    block_data,c = self._vdev.read_block(bp, dva=0)
+                    if (not c) or block_data is None:
                         print("[-]  Unreadable block")
                         bad_block = True
                 if bad_block:
@@ -220,7 +221,7 @@ class Dataset(ObjectSet):
                     continue
                 file_info = entry_dnode.bonus
                 full_name = dir_prefix + name
-                print("[+]  Archiving {} ({} bytes)".format(name, file_info.zp_size))
+                print(("[+]  Archiving "+color.UNDERLINE+"{}"+color.END+" ({} bytes)").format(name, file_info.size()))
                 if k == 'f':
                     success = self.extract_file(v, tmp_name)
                     if not success:
@@ -251,10 +252,10 @@ class Dataset(ObjectSet):
                     else:
                         # Link target is inline in the bonus data
                         tar_info.linkname = safe_decode_string(file_info.zp_inline_content[:file_info.zp_size])
-                tar_info.mtime = file_info.zp_mtime
-                tar_info.mode = file_info.zp_mode  # & 0x1ff
-                tar_info.uid = file_info.zp_uid
-                tar_info.gid = file_info.zp_gid
+                tar_info.mtime = file_info.mtime()
+                tar_info.mode = file_info.mode()  # & 0x1ff
+                tar_info.uid = file_info.uid()
+                tar_info.gid = file_info.gid()
                 # print("[+]  Archiving {} bytes from {}".format(tar_info.size, tar_info.name))
                 # f = FileObj(self._vdev, entry_dnode) if k == 'f' else None
                 try:
@@ -265,8 +266,8 @@ class Dataset(ObjectSet):
                             os.unlink(tmp_name)
                     else:
                         tar.addfile(tar_info)
-                except:
-                    print("[-]  Archiving {} failed".format(tar_info.name))
+                except Exception as e:
+                    print("[-]  Archiving {} failed: {}".format(tar_info.name,str(e)))
                 if k == 'd':
                     self._archive(tar, v, temp_dir, skip_objs, dir_prefix=full_name+'/')
 

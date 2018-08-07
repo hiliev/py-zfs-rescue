@@ -35,13 +35,31 @@ from zfs.zap import zap_factory
 from zfs.dataset import Dataset
 from zfs.objectset import ObjectSet
 from zfs.zio import RaidzDevice             # or MirrorDevice
+from zfs.blocktree import BlockTree
+from zfs.col import color
 
-from os import path
+import argparse
+import datetime
+
+from os import path, makedirs
+
+parser = argparse.ArgumentParser(description='zfs_rescue')
+parser.add_argument('--verbose', '-v', dest='verbose', action='count', default=0)
+parser.add_argument('--files', '-f', dest='files', type=str, default=None,
+                    help='Read blocks from files, specify disks.tab location')
+parser.add_argument('--label', '-l', dest='label', type=str, default='/dev/dsk/c3t0d0s7',
+                    help='Device where to read the initial label from')
+parser.add_argument('--child', '-C', dest='child', action='count', default=0, help='Archive first child dataset')
+args = parser.parse_args()
+
+if args.verbose > 0:
+    BlockTree.VERBOSE_TRAVERSE = 1
 
 BLK_PROXY_ADDR = ("localhost", 24892)       # network block server
-# BLK_PROXY_ADDR = ("files:", "disks.tab")  # local device nodes
+if not args.files is None:
+    BLK_PROXY_ADDR = ("files:", args.files)  # local device nodes
+BLK_INITIAL_DISK = args.label      # device to read the label from
 
-BLK_INITIAL_DISK = "/dev/dsk/c3t0d0s7"      # device to read the label from
 TXG = -1                                    # select specific transaction or -1 for the active one
 
 TEMP_DIR = "/tmp"
@@ -97,7 +115,7 @@ datasets = {}
 
 # Try all copies of the MOS
 for dva in range(3):
-    mos = ObjectSet(pool_dev, root_blkptr, dva=dva)
+    mos = ObjectSet(pool_dev, root_blkptr, dvas=(dva,))
     for n in range(len(mos)):
         d = mos[n]
         # print("[+]  dnode[{:>3}]={}".format(n, d))
@@ -120,16 +138,19 @@ try:
             print("[+] child %s with dataset %d" %(k,cds))
             # mos[cds] points to a 'zap' with "bonus  DSL dataset"
             datasets[cds] = mos[cds]
+            if args.child:
+                DS_TO_ARCHIVE.append(cds);
 except:
     pass
     
 print("[+] {} datasets found".format(len(datasets)))
 
 for dsid in datasets:
-    print("[+] Dataset", dsid)
+    print("[+] Dataset "+color.GREEN+("%d" %(dsid))+color.END)
     ds_dnode = datasets[dsid]
     print("[+]  dnode {}".format(ds_dnode))
-    print("[+]  creation timestamp {}".format(ds_dnode.bonus.ds_creation_time))
+    ds_creation_time = datetime.datetime.fromtimestamp(ds_dnode.bonus.ds_creation_time).strftime('%Y-%m-%d %H:%M:%S')
+    print("[+]  creation timestamp {}".format(ds_creation_time))
     print("[+]  creation txg {}".format(ds_dnode.bonus.ds_creation_txg))
     print("[+]  {} uncompressed bytes".format(ds_dnode.bonus.ds_uncompressed_bytes))
     if FAST_ANALYSIS:
@@ -140,9 +161,11 @@ for dsid in datasets:
         ddss.export_file_list(path.join(OUTPUT_DIR, "ds_{}_filelist.csv".format(dsid)))
 
 for dsid in DS_TO_ARCHIVE:
-    ddss = Dataset(pool_dev, datasets[dsid], dva=1)
+    ddss = Dataset(pool_dev, datasets[dsid], dvas=(0,1))
     ddss.analyse()
     # ddss.prefetch_object_set()
+    if not path.exists(OUTPUT_DIR):
+        makedirs(OUTPUT_DIR)
     if len(DS_OBJECTS) > 0:
         for dnid, objname in DS_OBJECTS:
             ddss.archive(path.join(OUTPUT_DIR, "ds_{}_{}.tar".format(dsid, objname)),
