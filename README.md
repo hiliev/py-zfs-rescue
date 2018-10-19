@@ -19,17 +19,23 @@ The code was developed specifically against a broken ZFS raidz1 pool created by 
 * directories with small to moderately large number of elements
 * access to remote disks via a simple TCP/IP protocol
 
+Thanks to the work of @eiselekd, additional support was added for:
+
+* LZ4 compression
+* Fletcher checksum validation
+* modern ZFS attributes
+
 ## What it is not?
 This is not a generic rescue tool or a filesystem debugger *per se*. It provides no command-line interface and all configuration is done by altering the source code. The output is quite technical and requires some understanding of the ZFS internals and on-disk structure.
 
 The ZFS implementation is minimal and incomplete. It is basically in a "works for me" state. Notably the following features are missing:
 
 * support for really large directories (it could be implemented relatively easily)
-* validation of the block checksums -- currently the tool relies on all metadata being compressed and the LZJB decompressor failing with garbled input data
-* LZ4 and GZIP decompression
+* ~validation of the block checksums -- currently the tool relies on all metadata being compressed and the LZJB decompressor failing with garbled input data~
+* ~LZ4 and~ GZIP decompression
 * support for pools created on big-endian systems
 
 There is minimal to no error recovery and encountering an unsupported object will abort the program. This is intentional as it helps easily spot unimplemented features and deviations from the specification.
 
 ## How to use it?
-See the wiki.
+Documentation is currently a WiP.
