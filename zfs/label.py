@@ -99,7 +99,10 @@ class Label:
         return None
 
     def get_vdev_disks(self):
-        return list(map(lambda x: x['path'], self._nvlist['vdev_tree']['children']))
+        try:
+            return list(map(lambda x: x['path'], self._nvlist['vdev_tree']['children']))
+        except:
+            return list([self._nvlist['vdev_tree']['path']]) # pool of one
 
     def get_txg(self):
         return self._nvlist['txg']
