@@ -34,6 +34,7 @@ from zfs.lz4zfs import lz4zfs_decompress
 
 from os import path
 import struct;
+import zlib
 
 LOG_QUIET = 0
 LOG_VERBOSE = 1
@@ -49,9 +50,27 @@ class GenericDevice:
     COMP_TYPE_ON = 1
     COMP_TYPE_LZJB = 3
     COMP_TYPE_LZ4 = 15
+    COMP_TYPE_GZIP_1 = 5
+    COMP_TYPE_GZIP_2 = 6
+    COMP_TYPE_GZIP_3 = 7
+    COMP_TYPE_GZIP_4 = 8
+    COMP_TYPE_GZIP_5 = 9
+    COMP_TYPE_GZIP_6 = 10
+    COMP_TYPE_GZIP_7 = 11
+    COMP_TYPE_GZIP_8 = 12
+    COMP_TYPE_GZIP_9 = 13
     CompType = {
         COMP_TYPE_ON:   "LZJB",
         COMP_TYPE_LZJB: "LZJB",
+        COMP_TYPE_GZIP_1: "GZIP1",
+        COMP_TYPE_GZIP_2: "GZIP2",
+        COMP_TYPE_GZIP_3: "GZIP3",
+        COMP_TYPE_GZIP_4: "GZIP4",
+        COMP_TYPE_GZIP_5: "GZIP5",
+        COMP_TYPE_GZIP_6: "GZIP6",
+        COMP_TYPE_GZIP_7: "GZIP7",
+        COMP_TYPE_GZIP_8: "GZIP8",
+        COMP_TYPE_GZIP_9: "GZIP9",
         COMP_TYPE_LZ4:  "LZ4"
     }
     def __init__(self, child_devs, block_provider_addr, dump_dir="/tmp"):
@@ -101,6 +120,9 @@ class GenericDevice:
                 try:
                     if (bptr.comp_alg == GenericDevice.COMP_TYPE_LZ4):
                         data = lz4zfs_decompress(data, lsize)
+                    elif (bptr.comp_alg >= GenericDevice.COMP_TYPE_GZIP_1) and \
+                         (bptr.comp_alg <= GenericDevice.COMP_TYPE_GZIP_9) :
+                        data = zlib.decompress(data)
                     else:
                         data = lzjb_decompress(data, lsize)
                 except:
