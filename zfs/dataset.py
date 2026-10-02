@@ -165,6 +165,9 @@ class Dataset(ObjectSet):
                 if bp is None:
                     print("[-]  Broken block tree")
                     bad_block = True
+                elif bp.empty:
+                    # A hole is a valid logical block filled with zeroes.
+                    block_data = b'\x00' * file_dnode.datablksize
                 else:
                     block_data,c = self._vdev.read_block(bp, dva=0)
                     if (not c) or block_data is None:

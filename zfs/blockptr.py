@@ -100,13 +100,14 @@ class BlockPtr:
         self._fill_count = qwords[11]
         self._checksum = qwords[12:16]
         if self._embeded:
-            self._dva0 = self._dva0 = DVA(0, 0)
-            self._dva1 = self._dva0 = DVA(0, 0)
-            self._dva2 = self._dva0 = DVA(0, 0)
-            self._embeded_lsize = (qwords[6]) & 0x1ffffff
+            self._dva0 = DVA(0, 0)
+            self._dva1 = DVA(0, 0)
+            self._dva2 = DVA(0, 0)
+            # Embedded sizes are stored as size minus one.
+            self._embeded_lsize = (qwords[6] & 0x1ffffff) + 1
             self._embeded_data = data[0:(6*8)] + data[(7*8):(10*8)] + data[(11*8):(16*8)]
             self._etype = (qwords[6] >> 40) & 0xff
-            self._psize = (qwords[6] >> 25) & 0x7f
+            self._psize = ((qwords[6] >> 25) & 0x7f) + 1
             self._lsize = self._embeded_lsize
             if VERBOSE_EMBED:
                 print("[E]: zdb -E %x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x | xxd" %(

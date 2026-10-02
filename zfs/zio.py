@@ -101,9 +101,10 @@ class GenericDevice:
             lsize = bptr._embeded_lsize
             data = bptr._embeded_data
         else:
-            rsize = psize
-            if psize < (1 << self._ashift):
-                rsize = 1 << self._ashift
+            # Block pointers encode physical size in 512-byte units, while
+            # RAIDZ mapping works in ashift-sized sectors. A non-aligned read
+            # otherwise omits the final allocated sector.
+            rsize = roundup(psize, 1 << self._ashift)
             data = self._read_physical(offset, rsize, debug_dump, debug_prefix)
 
             if bptr._cksum == 7 and DO_CHKSUM:
@@ -155,7 +156,7 @@ class MirrorDevice(GenericDevice):
     def __init__(self, child_vdevs, proxy_addr, ashift=9, bad=None, dump_dir="/tmp"):
         super().__init__(child_vdevs, proxy_addr, dump_dir=dump_dir)
         self._ashift = ashift
-        self._bad = bad
+        self._bad = bad or []
         if self._bad and len(self._bad) > len(self._devs):
             print("[-] Mirror created with more bad disks than copies!")
 
@@ -176,7 +177,7 @@ class RaidzDevice(GenericDevice):
         super().__init__(child_vdevs, proxy_addr, dump_dir=dump_dir)
         self._ashift = ashift
         self._nparity = nparity
-        self._bad = bad
+        self._bad = bad or []
         self._repair = repair
         if self._nparity != 1:
             print("[-] Raidz with parity != 1 is not supported!")
@@ -184,9 +185,6 @@ class RaidzDevice(GenericDevice):
             print("[-] Raidz created with more bad disks than parity allows!")
 
     def _read_physical(self, offset, psize, debug_dump, debug_prefix):
-        if offset > 8*1024*1024*1024*1024: # 3tb, unrealistic
-            print ("[-] offset limit reached %d" %(offset))
-            return None
         (cols, firstdatacol, skipstart) = self._map_alloc(offset, psize, self._ashift)
         col_data = []
         blockv = []

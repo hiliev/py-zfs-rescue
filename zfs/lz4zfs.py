@@ -10,6 +10,8 @@ def lz4zfs_decompress(src,dsize):
     VERBOSE=0
     ip = 4
     iend, = struct.unpack(">I",src[0:4]);
+    # The header stores the payload length, not an absolute end offset.
+    iend += 4
     dst = bytearray()
 
     try:
@@ -32,6 +34,10 @@ def lz4zfs_decompress(src,dsize):
 
             dst += src[ip:ip+length]
             ip += length
+
+            # A valid LZ4 stream may end with a literal-only sequence.
+            if ip >= iend:
+                break
 
             off, = struct.unpack("<H",src[ip:ip+2]);
             ip += 2
